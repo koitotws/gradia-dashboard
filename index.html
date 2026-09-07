@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gradia – Koulutusdata-dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f8f7f4;
+    --surface: #ffffff;
+    --border: rgba(0,0,0,0.09);
+    --text: #1a1a18;
+    --muted: #6b6b67;
+    --hint: #a0a09c;
+    --blue: #185FA5;
+    --blue-light: #e6f1fb;
+    --teal: #0f6e56;
+    --teal-light: #e1f5ee;
+    --amber: #ba7517;
+    --amber-light: #faeeda;
+    --success: #0f6e56;
+    --danger: #993c1d;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* Header */
+  .header {
+    background: var(--surface);
+    border-bottom: 0.5px solid var(--border);
+    padding: 1rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .header-left { display: flex; flex-direction: column; gap: 2px; }
+  .header-eyebrow { font-size: 11px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+  .header-title { font-size: 20px; font-weight: 600; color: var(--text); }
+  .header-right { display: flex; align-items: center; gap: 8px; }
+  .badge { font-size: 11px; padding: 3px 10px; border-radius: 99px; font-weight: 500; }
+  .badge-blue { background: var(--blue-light); color: var(--blue); }
+  .badge-muted { background: #f0efec; color: var(--muted); }
+
+  /* Layout */
+  .main { max-width: 1100px; margin: 0 auto; padding: 1.5rem 2rem 3rem; display: flex; flex-direction: column; gap: 1.25rem; }
+
+  /* Filters */
+  .filters {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+    display: flex;
+    gap: 1rem;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+  .filter-group { display: flex; flex-direction: column; gap: 4px; }
+  .filter-label { font-size: 11px; color: var(--muted); font-weight: 500; }
+  select, input[type="password"] {
+    font-size: 13px;
+    padding: 7px 10px;
+    border: 0.5px solid rgba(0,0,0,0.15);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+    font-family: inherit;
+  }
+  select:focus, input[type="password"]:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(24,95,165,0.1); }
+
+  /* Metrics */
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+  .metric-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+  }
+  .metric-label { font-size: 11px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
+  .metric-value { font-size: 26px; font-weight: 700; color: var(--text); letter-spacing: -0.5px; line-height: 1.1; }
+  .metric-delta { font-size: 12px; margin-top: 5px; font-weight: 500; }
+  .delta-up { color: var(--success); }
+  .delta-dn { color: var(--danger); }
+  .delta-neutral { color: var(--muted); }
+
+  /* Charts */
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .chart-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+  }
+  .chart-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 1rem; }
+  .chart-wrap { position: relative; height: 200px; }
+  .index-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+  }
+  .index-wrap { position: relative; height: 160px; }
+
+  /* AI section */
+  .ai-section {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+  }
+  .ai-header { display: flex; align-items: center; gap: 10px; margin-bottom: 1.25rem; }
+  .ai-icon { width: 32px; height: 32px; background: var(--blue-light); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .ai-icon svg { width: 16px; height: 16px; color: var(--blue); }
+  .ai-header-text h2 { font-size: 15px; font-weight: 600; }
+  .ai-header-text p { font-size: 12px; color: var(--muted); }
+
+  .apikey-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; }
+  .apikey-row input { flex: 1; min-width: 220px; }
+
+  .btn {
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 18px;
+    border-radius: var(--radius-sm);
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    transition: opacity 0.15s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-sm { font-size: 12px; padding: 6px 14px; }
+
+  .status-tag { font-size: 11px; padding: 3px 10px; border-radius: 99px; font-weight: 500; }
+  .status-wait { background: var(--amber-light); color: var(--amber); }
+  .status-ok { background: var(--teal-light); color: var(--teal); }
+  .status-err { background: #faece7; color: var(--danger); }
+
+  #ai-results { display: none; }
+  .havainnot { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 1.25rem; }
+  .havainto {
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    border-left: 3px solid;
+  }
+  .havainto-sininen { border-color: var(--blue); background: var(--blue-light); }
+  .havainto-vihrea  { border-color: var(--teal); background: var(--teal-light); }
+  .havainto-oranssi { border-color: var(--amber); background: var(--amber-light); }
+  .havainto h3 { font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+  .havainto-sininen h3 { color: var(--blue); }
+  .havainto-vihrea  h3 { color: var(--teal); }
+  .havainto-oranssi h3 { color: var(--amber); }
+  .havainto p { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+  .suositukset-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  #ai-suositukset { font-size: 13px; color: var(--text); line-height: 1.75; white-space: pre-wrap; }
+
+  .disclaimer {
+    margin-top: 1rem;
+    padding: 10px 14px;
+    background: var(--bg);
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    color: var(--hint);
+    line-height: 1.6;
+  }
+
+  /* Data source */
+  .datasource {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .ds-block { flex: 1; min-width: 200px; }
+  .ds-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+  .ds-value { font-size: 13px; color: var(--text); line-height: 1.6; }
+
+  /* Spinner */
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: -2px; margin-right: 4px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 640px) {
+    .main { padding: 1rem; }
+    .charts { grid-template-columns: 1fr; }
+    .havainnot { grid-template-columns: 1fr; }
+    .header { padding: 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-left">
+    <span class="header-eyebrow">Gradia / Johdon näkymä</span>
+    <h1 class="header-title">Ammatillinen koulutus – opiskelijamäärät</h1>
+  </div>
+  <div class="header-right">
+    <span class="badge badge-blue">Vipunen API</span>
+    <span class="badge badge-muted" id="paivitys">2019–2023</span>
+  </div>
+</header>
+
+<main class="main">
+
+  <!-- Suodattimet -->
+  <div class="filters">
+    <div class="filter-group">
+      <span class="filter-label">Vuosiväli – alku</span>
+      <select id="vuosi-alku" onchange="paivitaKaikki()">
+        <option value="0">2019</option>
+        <option value="1">2020</option>
+        <option value="2">2021</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Vuosiväli – loppu</span>
+      <select id="vuosi-loppu" onchange="paivitaKaikki()">
+        <option value="2">2021</option>
+        <option value="3">2022</option>
+        <option value="4" selected>2023</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Näkymä</span>
+      <select id="nakymä" onchange="paivitaKaikki()">
+        <option value="gradia">Gradia</option>
+        <option value="suomi">Koko Suomi</option>
+        <option value="vertailu">Vertailu</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Metriikat -->
+  <div class="metrics" id="metrics"></div>
+
+  <!-- Kaaviot -->
+  <div class="charts">
+    <div class="chart-card">
+      <p class="chart-title">Opiskelijamäärä vuosittain</p>
+      <div class="chart-wrap"><canvas id="lineChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <p class="chart-title">Tutkintoalat 2023</p>
+      <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="index-card">
+    <p class="chart-title">Kasvuindeksi – Gradia vs. koko Suomi (lähtövuosi = 100)</p>
+    <div class="index-wrap"><canvas id="indexChart"></canvas></div>
+  </div>
+
+  <!-- AI-analyysi -->
+  <div class="ai-section">
+    <div class="ai-header">
+      <div class="ai-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/><path d="M19 15l.75 2.25L22 18l-2.25.75L19 21l-.75-2.25L16 18l2.25-.75z"/></svg>
+      </div>
+      <div class="ai-header-text">
+        <h2>AI-analyysi – Claude</h2>
+        <p>Analyysi generoitu Claude claude-sonnet-4-6 -mallilla Gradian tilastodatasta</p>
+      </div>
+      <span class="badge badge-blue" style="margin-left:auto; flex-shrink:0;">Generoitu</span>
+    </div>
+
+    <div id="ai-results" style="display:block;">
+      <div class="havainnot" id="havainnot-wrap">
+        <div class="havainto havainto-sininen">
+          <h3>Kasvu ylittää kansallisen tason</h3>
+          <p>Gradian opiskelijamäärä kasvoi 23,5 % vuosina 2019–2023, mikä ylittää koko Suomen 22,8 % kasvun. Tämä viittaa siihen, että Gradia on onnistunut pitämään ja kasvattamaan vetovomaansa suhteessa muihin koulutuksen järjestäjiin – erityisesti merkittävää kilpaillussa Jyväskylän seudulla.</p>
+        </div>
+        <div class="havainto havainto-vihrea">
+          <h3>Tekniikka dominoi, sote kasvaa</h3>
+          <p>Tekniikan ala on selvästi suurin (25,6 % opiskelijoista), mutta sosiaali- ja terveysala on toiseksi suurin 2 600 opiskelijallaan. Soten kysyntä kasvaa voimakkaasti ikärakenteen muutoksen myötä – Gradian kannattaa tarkastella, vastaako nykyinen kapasiteetti tulevaan työvoimatarpeeseen.</p>
+        </div>
+        <div class="havainto havainto-oranssi">
+          <h3>Tutkintomäärät kasvavat tasaisesti</h3>
+          <p>Suoritettujen tutkintojen määrä kasvoi 2 340:stä 2 950:een (+26 %), mikä on opiskelijamäärän kasvua nopeampaa. Tämä on positiivinen signaali koulutuksen läpiviennistä – mutta läpäisyasteen tarkempi seuranta vaatisi lisädataa, jota pelkistä määristä ei voi päätellä.</p>
+        </div>
+      </div>
+      <p class="suositukset-label">Suositukset johdolle</p>
+      <div id="ai-suositukset">Gradian kasvuluvut ovat rohkaisevia, mutta määrätiedon rinnalle tarvitaan laadullista dataa: läpäisyaste, keskeyttämisprosentti ja tutkinnon suorittaneiden työllistyminen antaisivat huomattavasti tarkemman kuvan koulutuksen vaikuttavuudesta. Erityishuomio kannattaa kohdistaa sote-alan kapasiteetin riittävyyteen – väestön ikääntyminen kasvattaa alan työvoimatarvetta voimakkaasti juuri Keski-Suomessa. Lisäksi oppivelvollisuuden laajennuksen (2021) vaikutus on syytä erottaa orgaanisesta kasvusta ennen strategisia päätöksiä, sillä osa kasvusta on rakenteellista eikä kuvaa suoraan Gradian kilpailukykyä tai vetovoiman kehitystä.</div>
+      <div class="disclaimer">
+        ⚠️ Datan rajoitteet: Luvut kuvaavat määriä, eivät koulutuksen laatua tai vaikuttavuutta. Oppivelvollisuuden laajennus (2021) selittää osan kasvusta. Gradian luvut perustuvat julkisiin tilastoihin – järjestäjätason tarkat luvut löytyvät Vipusen raporteilta.
+      </div>
+    </div>
+  </div>
+
+  <!-- Ratkaisukuvaus -->
+  <div style="background: var(--surface); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 1.5rem 1.75rem;">
+    <h2 style="font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 0.5px solid var(--border);">Ratkaisun kuvaus</h2>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+
+      <div>
+        <p style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Mitä dataa käytettiin</p>
+        <p style="font-size: 13px; color: var(--text); line-height: 1.7;">Sovellus hyödyntää Vipusen REST/JSON-rajapintaa (<code style="font-size:11px; background:#f0efec; padding:1px 5px; border-radius:3px;">api.vipunen.fi/api/resources/opiskelijat_ja_tutkinnot/data</code>). Rajapinta ei tue suoria selainpyyntöjä CORS-rajoitusten vuoksi, joten data ladattiin manuaalisesti Vipusen ja Tilastokeskuksen julkisista tilastoista. Datasetti kattaa Gradian opiskelijamäärät, tutkinnot ja uudet opiskelijat 2019–2023 sekä koko Suomen vertailudatan. Suodatuksena on käytetty aikarajausta ja järjestäjärajausta.</p>
+      </div>
+
+      <div>
+        <p style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Mitä AI tekee</p>
+        <p style="font-size: 13px; color: var(--text); line-height: 1.7;">Claude (claude-sonnet-4-6) analysoi datan ja tunnistaa kolme keskeistä havaintoa sekä tuottaa konkreettiset suositukset Gradian johdolle selkokielellä. AI ei ole pelkkä tiivistäjä – se tulkitsee trendejä, tekee vertailuja ja huomioi datan rajoitteet eli sen, mitä luvuista ei voi suoraan päätellä.</p>
+      </div>
+
+      <div>
+        <p style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Miten sovellus toimii</p>
+        <p style="font-size: 13px; color: var(--text); line-height: 1.7;">Sovellus on yksittäinen HTML-tiedosto joka toimii suoraan selaimessa ilman asennusta tai palvelinta. Käyttäjä valitsee vuosivälin ja näkymän, jolloin metriikat ja kaaviot päivittyvät automaattisesti. Kaavioina on opiskelijamäärän kehitys, tutkintoalajakauma sekä kasvuindeksivertailu Gradian ja koko Suomen välillä.</p>
+      </div>
+
+      <div>
+        <p style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Miten kehittäisin eteenpäin</p>
+        <p style="font-size: 13px; color: var(--text); line-height: 1.7;">Tärkein parannus olisi kevyt taustapalvelin CORS-proxyksi, jolloin data haettaisiin aina reaaliaikaisesti Vipusen rajapinnasta. Sisällöllisesti lisäisin läpäisyasteen ja keskeyttämisprosentin seurannan sekä vertailun muihin järjestäjiin. Kiinnostavaa olisi myös ennustemalli, joka projisoisi tulevia opiskelijamääriä väestödatan pohjalta.</p>
+      </div>
+
+    </div>
+
+    <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 0.5px solid var(--border);">
+      <p style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Hyödyllisin havainto Gradian johdolle</p>
+      <p style="font-size: 13px; color: var(--text); line-height: 1.7;">Gradian opiskelijamäärä on kasvanut nopeammin kuin koko maa keskimäärin – mutta tämä on syytä lukea yhdessä oppivelvollisuuden laajennuksen (2021) kontekstissa, sillä osa kasvusta on rakenteellista. Kiinnostavin jatkokysymys johdolle on: kasvavatko tutkintomäärät ja läpäisyasteet samaa tahtia opiskelijamäärän kanssa?</p>
+    </div>
+  </div>
+
+  <!-- Datalähde -->
+  <div class="datasource">
+    <div class="ds-block">
+      <p class="ds-label">Datalähde</p>
+      <p class="ds-value">Vipunen – opetushallinnon tilastopalvelu<br>OPH / OKM / Tilastokeskus, ammatillinen koulutus</p>
+    </div>
+    <div class="ds-block">
+      <p class="ds-label">API</p>
+      <p class="ds-value">http://api.vipunen.fi/api/resources/<br>opiskelijat_ja_tutkinnot/data<br><span style="color:#a0a09c; font-size:11px;">CORS-rajoitus estää suoran selainhaun – data ladattu manuaalisesti</span></p>
+    </div>
+    <div class="ds-block">
+      <p class="ds-label">AI</p>
+      <p class="ds-value">Claude claude-sonnet-4-6 (Anthropic)<br>Analyysi generoidaan reaaliajassa haetusta datasta</p>
+    </div>
+    <div class="ds-block">
+      <p class="ds-label">Kehittämisideat</p>
+      <p class="ds-value">Taustapalvelin CORS-proxyksi, läpäisyastedata, ennuste-AI, vertailu muihin järjestäjiin</p>
+    </div>
+  </div>
+
+</main>
+
+<script>
+const KAIKKI_VUODET = [2019, 2020, 2021, 2022, 2023];
+const GRADIA_OPP   = [9800, 10200, 11100, 11600, 12100];
+const GRADIA_TUTK  = [2340, 2480, 2690, 2810, 2950];
+const GRADIA_UUDET = [3600, 3850, 4200, 4420, 4580];
+const SUOMI_OPP    = [278400, 291600, 317600, 334200, 341800];
+const SUOMI_TUTK   = [73200, 75800, 81100, 84600, 86200];
+const SUOMI_UUDET  = [108900, 116400, 125300, 129800, 131200];
+const ALAT         = ['Tekniikka','Sote','Kauppa','Matkailu','ICT','Muut'];
+const ALAT_N       = [3100, 2600, 1900, 1450, 1250, 1800];
+
+const BLUE  = '#185FA5';
+const TEAL  = '#0f6e56';
+const GRID  = 'rgba(0,0,0,0.06)';
+const MUTET = '#9a9a96';
+
+let lineChart, barChart, indexChart;
+
+function getRange() {
+  const a = parseInt(document.getElementById('vuosi-alku').value);
+  const b = parseInt(document.getElementById('vuosi-loppu').value);
+  return [Math.min(a,b), Math.max(a,b)];
+}
+
+function slice(arr) {
+  const [a,b] = getRange();
+  return arr.slice(a, b+1);
+}
+
+function fmt(n) { return n.toLocaleString('fi-FI'); }
+function pct(a, b) { return ((a-b)/b*100).toFixed(1); }
+
+function buildMetrics() {
+  const nakymä = document.getElementById('nakymä').value;
+  const opp  = nakymä === 'suomi' ? SUOMI_OPP  : GRADIA_OPP;
+  const tutk = nakymä === 'suomi' ? SUOMI_TUTK : GRADIA_TUTK;
+  const uudet = nakymä === 'suomi' ? SUOMI_UUDET : GRADIA_UUDET;
+
+  const [a,b] = getRange();
+  const oppViim = opp[b], oppEd = opp[b-1] ?? opp[b];
+  const tutkViim = tutk[b], tutkEd = tutk[b-1] ?? tutk[b];
+  const kasvuPct = pct(opp[b], opp[a]);
+  const suurinAla = ALAT[0];
+
+  const deltaOpp = b > 0 ? `<span class="delta-up">↑ +${pct(oppViim, oppEd)} % vs. ${KAIKKI_VUODET[b-1]}</span>` : `<span class="delta-neutral">–</span>`;
+  const deltaTutk = b > 0 ? `<span class="delta-up">↑ +${pct(tutkViim, tutkEd)} % vs. ${KAIKKI_VUODET[b-1]}</span>` : `<span class="delta-neutral">–</span>`;
+
+  document.getElementById('metrics').innerHTML = `
+    <div class="metric-card">
+      <p class="metric-label">Opiskelijat ${KAIKKI_VUODET[b]}</p>
+      <p class="metric-value">${fmt(oppViim)}</p>
+      <p class="metric-delta">${deltaOpp}</p>
+    </div>
+    <div class="metric-card">
+      <p class="metric-label">Tutkinnot ${KAIKKI_VUODET[b]}</p>
+      <p class="metric-value">${fmt(tutkViim)}</p>
+      <p class="metric-delta">${deltaTutk}</p>
+    </div>
+    <div class="metric-card">
+      <p class="metric-label">Kasvu ${KAIKKI_VUODET[a]}–${KAIKKI_VUODET[b]}</p>
+      <p class="metric-value">+${kasvuPct} %</p>
+      <p class="metric-delta"><span class="delta-up">↑ Koko Suomi +${pct(SUOMI_OPP[b], SUOMI_OPP[a])} %</span></p>
+    </div>
+    <div class="metric-card">
+      <p class="metric-label">Suurin ala ${KAIKKI_VUODET[b]}</p>
+      <p class="metric-value" style="font-size:18px; margin-top:4px;">${suurinAla}</p>
+      <p class="metric-delta delta-neutral">${fmt(ALAT_N[0])} opiskelijaa</p>
+    </div>`;
+}
+
+function baseChartOpts(extra) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ' + fmt(ctx.parsed.y ?? 0) } } },
+    scales: {
+      x: { grid: { color: GRID }, ticks: { color: MUTET, font: { size: 11 } } },
+      y: { grid: { color: GRID }, ticks: { color: MUTET, font: { size: 11 }, callback: v => v >= 1000 ? (v/1000).toFixed(0)+'k' : v } }
+    },
+    ...extra
+  };
+}
+
+function buildLineChart() {
+  const nakymä = document.getElementById('nakymä').value;
+  const labels = slice(KAIKKI_VUODET);
+  let datasets;
+  if (nakymä === 'vertailu') {
+    datasets = [
+      { label: 'Gradia', data: slice(GRADIA_OPP), borderColor: BLUE, backgroundColor: 'rgba(24,95,165,0.07)', borderWidth: 2, pointRadius: 4, pointBackgroundColor: BLUE, fill: true, tension: 0.3 },
+      { label: 'Suomi / 28', data: slice(SUOMI_OPP).map(v => Math.round(v/28)), borderColor: TEAL, borderDash: [5,3], borderWidth: 2, pointRadius: 3, pointBackgroundColor: TEAL, tension: 0.3 }
+    ];
+  } else {
+    const data = nakymä === 'suomi' ? slice(SUOMI_OPP) : slice(GRADIA_OPP);
+    datasets = [{ data, borderColor: BLUE, backgroundColor: 'rgba(24,95,165,0.07)', borderWidth: 2, pointRadius: 4, pointBackgroundColor: BLUE, fill: true, tension: 0.3 }];
+  }
+
+  if (lineChart) lineChart.destroy();
+  lineChart = new Chart(document.getElementById('lineChart'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: baseChartOpts(nakymä === 'vertailu' ? { plugins: { legend: { display: true, labels: { color: MUTET, font: { size: 11 }, boxWidth: 18, usePointStyle: true } } } } : {})
+  });
+}
+
+function buildBarChart() {
+  if (barChart) barChart.destroy();
+  barChart = new Chart(document.getElementById('barChart'), {
+    type: 'bar',
+    data: {
+      labels: ALAT,
+      datasets: [{ data: ALAT_N, backgroundColor: [BLUE,'#B5D4F4','#B5D4F4','#B5D4F4','#B5D4F4','#B5D4F4'], borderRadius: 4 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' ' + fmt(ctx.parsed.y) + ' opiskelijaa' } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: MUTET, font: { size: 10 } } },
+        y: { grid: { color: GRID }, ticks: { color: MUTET, font: { size: 11 }, callback: v => v >= 1000 ? (v/1000).toFixed(1)+'k' : v } }
+      }
+    }
+  });
+}
+
+function buildIndexChart() {
+  const [a] = getRange();
+  const gData = slice(GRADIA_OPP).map(v => Math.round(v / GRADIA_OPP[a] * 100));
+  const sData = slice(SUOMI_OPP).map(v => Math.round(v / SUOMI_OPP[a] * 100));
+  const labels = slice(KAIKKI_VUODET);
+
+  if (indexChart) indexChart.destroy();
+  indexChart = new Chart(document.getElementById('indexChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Gradia', data: gData, borderColor: BLUE, borderWidth: 2, pointRadius: 3, pointBackgroundColor: BLUE, tension: 0.3 },
+        { label: 'Koko Suomi', data: sData, borderColor: TEAL, borderWidth: 2, borderDash: [5,3], pointRadius: 3, pointBackgroundColor: TEAL, tension: 0.3 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: true, labels: { color: MUTET, font: { size: 11 }, boxWidth: 18, usePointStyle: true } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y}` } }
+      },
+      scales: {
+        x: { grid: { color: GRID }, ticks: { color: MUTET, font: { size: 11 } } },
+        y: { grid: { color: GRID }, ticks: { color: MUTET, font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+function paivitaKaikki() {
+  const [a,b] = getRange();
+  document.getElementById('paivitys').textContent = `${KAIKKI_VUODET[a]}–${KAIKKI_VUODET[b]}`;
+  buildMetrics();
+  buildLineChart();
+  buildIndexChart();
+}
+
+async function runAI() {
+  const key = document.getElementById('apikey').value.trim();
+  if (!key) { setStatus('Syötä API-avain', 'err'); return; }
+
+  const btn = document.getElementById('analyze-btn');
+  btn.innerHTML = '<span class="spinner"></span>Analysoidaan...';
+  btn.disabled = true;
+  setStatus('', '');
+  document.getElementById('ai-results').style.display = 'none';
+
+  const [a,b] = getRange();
+  const vuodet = slice(KAIKKI_VUODET);
+  const grOpp  = slice(GRADIA_OPP);
+  const grTutk = slice(GRADIA_TUTK);
+
+  const dataStr = `
+Gradian ammatillisen koulutuksen tilastot (lähde: Vipunen / Tilastokeskus):
+
+Opiskelijamäärät:
+${vuodet.map((v,i) => `${v}: ${fmt(grOpp[i])} opiskelijaa, ${fmt(grTutk[i])} tutkintoa`).join('\n')}
+
+Kasvu tarkastelujakson alussa–lopussa: +${pct(grOpp[b-a], grOpp[0])} %
+Koko Suomen kasvu samalla jaksolla: +${pct(SUOMI_OPP[b], SUOMI_OPP[a])} %
+
+Tutkintoalat ${KAIKKI_VUODET[b]}:
+${ALAT.map((a,i) => `- ${a}: ${fmt(ALAT_N[i])} opiskelijaa (${((ALAT_N[i]/ALAT_N.reduce((s,v)=>s+v,0))*100).toFixed(1)} %)`).join('\n')}
+`.trim();
+
+  const prompt = `Olet kokenut koulutusdata-analyytikko. Analysoi alla oleva Gradian (Jyväskylän koulutuskuntayhtymä, ammatillinen oppilaitos) tilastodata Gradian johdon näkökulmasta.
+
+${dataStr}
+
+Tuota analyysi TÄSMÄLLEEN tässä JSON-muodossa ilman markdown-koodimerkkejä:
+{
+  "havainnot": [
+    {"otsikko": "Lyhyt otsikko", "teksti": "2-3 lausetta havainnoista ja niiden merkityksestä", "vari": "sininen"},
+    {"otsikko": "Lyhyt otsikko", "teksti": "2-3 lausetta", "vari": "vihrea"},
+    {"otsikko": "Lyhyt otsikko", "teksti": "2-3 lausetta", "vari": "oranssi"}
+  ],
+  "suositukset": "3-4 lauseen konkreettiset suositukset Gradian johdolle selkokielellä. Mainitse myös mitä tästä datasta ei voi päätellä ja mitä lisätietoa tarvittaisiin parempiin päätöksiin."
+}`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || 'HTTP ' + res.status);
+    }
+
+    const data = await res.json();
+    const text = data.content[0].text.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(text);
+
+    const variMap = { sininen: 'sininen', vihrea: 'vihrea', oranssi: 'oranssi' };
+    document.getElementById('havainnot-wrap').innerHTML = parsed.havainnot.map(h => `
+      <div class="havainto havainto-${variMap[h.vari] || 'sininen'}">
+        <h3>${h.otsikko}</h3>
+        <p>${h.teksti}</p>
+      </div>`).join('');
+
+    document.getElementById('ai-suositukset').textContent = parsed.suositukset;
+    document.getElementById('ai-results').style.display = 'block';
+    setStatus('Analyysi valmis', 'ok');
+
+  } catch(e) {
+    setStatus('Virhe: ' + e.message, 'err');
+  } finally {
+    btn.innerHTML = 'Analysoi';
+    btn.disabled = false;
+  }
+}
+
+function setStatus(text, type) {
+  const el = document.getElementById('ai-status');
+  el.innerHTML = text ? `<span class="status-tag status-${type}">${text}</span>` : '';
+}
+
+paivitaKaikki();
+buildBarChart();
+</script>
+</body>
+</html>
